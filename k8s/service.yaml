@@ -1,0 +1,26 @@
+apiVersion: v1
+kind: Service                  # A Service exposes Pods on the network
+
+metadata:
+  name: wedding-go             # Name of the Service
+
+spec:
+  type: NodePort               # Exposes the service on a port of each node
+  # Allows external access from outside the cluster
+
+  selector:
+    app: wedding-go            # VERY IMPORTANT
+    # The Service will send traffic to Pods
+    # that have the label "app: wedding-go"
+
+  ports:
+    - port: 8080               # Port exposed INSIDE the cluster
+      # Other pods would call: wedding-go:8080
+
+      protocol: TCP
+
+      targetPort: 8080         # Port on the Pod/container receiving traffic
+
+      nodePort: 30080          # Port exposed on your machine (the node)
+      # Access from your browser with:
+      # http://<node-ip>:30080

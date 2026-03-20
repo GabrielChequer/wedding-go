@@ -1,0 +1,40 @@
+apiVersion: apps/v1          # API group/version used for Deployments
+kind: Deployment             # This object manages a set of Pods
+
+metadata:
+  name: wedding-go           # Name of the Deployment (used internally by Kubernetes)
+
+spec:
+  replicas: 2                # Number of Pods Kubernetes should keep running
+
+  selector:                  # Tells the Deployment which Pods belong to it
+    matchLabels:
+      app: wedding-go        # Deployment will manage Pods that have this label
+
+  template:                  # Template used to CREATE Pods
+    metadata:
+      labels:
+        app: wedding-go      # Label applied to the Pods created from this template
+        # IMPORTANT: Must match the selector above
+
+    spec:
+      containers:
+        - name: wedding-go   # Name of the container inside the Pod
+
+          image: wedding-go:latest
+          # Docker image to run
+          # In your case it expects a local image called wedding-go:latest
+
+          imagePullPolicy: Never
+          # Kubernetes will NOT try to pull this image from a registry
+          # It will only use an image that already exists locally
+          # (common when using local clusters like Minikube or Docker Desktop)
+
+          ports:
+            - containerPort: 8080
+            # The port your application listens to INSIDE the container
+            # This is informational for Kubernetes but helps Services map traffic
+
+          env:
+            - name: DB_HOST
+              value: testing
