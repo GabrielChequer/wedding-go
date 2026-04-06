@@ -179,22 +179,34 @@ func searchInviteHandler(db *sql.DB) http.HandlerFunc {
 
 func handleRsvpResponse(db *sql.DB) http.HandlerFunc {
 	guestModel := models.NewGuestModel(db)
+	log.Printf("In handleRsvpResponse")
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
 			http.Error(w, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
 			return
 		}
-		var payload dbModels.NewRsvpResponse
+		var payload dbModels.RsvpResponse
+
 		decoder := json.NewDecoder(r.Body)
 		decoder.DisallowUnknownFields()
+
 		if err := decoder.Decode(&payload); err != nil {
-			http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
-			log.Printf("json decode failed: %v", err)
+			http.Error(w, "Invalid JSON: "+err.Error(), http.StatusBadRequest)
 			return
 		}
-		log.Printf("payload %+v", payload)
-		err := guestModel.RespondRsvp(payload.Responses)
+
+		log.Printf("Payload is %v", payload.Responses)
+		log.Printf("Payload is %v", payload.FamilyID)
+
+		w.Header().Set("Content-Type", "application/json")
+		err := json.NewEncoder(w).Encode("It's all good!")
 		if err != nil {
+			return
+		}
+
+		err = guestModel.RespondRsvp(payload)
+		if err != nil {
+			log.Printf("Failed to respond to rsvp: %v", err)
 			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 			return
 		}
@@ -249,6 +261,7 @@ func cors(next http.Handler) http.Handler {
 func main() {
 	log.Println("Initializing database")
 
+	// TODO: offload this to environment variables once app is running in Kubernetes
 	config := dbconnection.DBConnection{
 		Host:     getEnv("DB_HOST", "localhost"),
 		Port:     getEnvInt("DB_PORT", 5432),
