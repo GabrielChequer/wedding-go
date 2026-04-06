@@ -198,13 +198,7 @@ func handleRsvpResponse(db *sql.DB) http.HandlerFunc {
 		log.Printf("Payload is %v", payload.Responses)
 		log.Printf("Payload is %v", payload.FamilyID)
 
-		w.Header().Set("Content-Type", "application/json")
-		err := json.NewEncoder(w).Encode("It's all good!")
-		if err != nil {
-			return
-		}
-
-		err = guestModel.RespondRsvp(payload)
+		err := guestModel.RespondRsvp(payload)
 		if err != nil {
 			log.Printf("Failed to respond to rsvp: %v", err)
 			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
