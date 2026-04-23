@@ -85,9 +85,7 @@ func populateGuests(db *sql.DB) http.HandlerFunc {
 		var familiesInsertErrors int
 
 		for _, fam := range payload.Families {
-			// Print each Family with their family members
-			log.Printf("Adding family: %+v", fam)
-			var err error
+
 			familyName, familyID, err := guestModel.InsertNewFamiliesAndGuests(fam)
 			if err != nil {
 				log.Printf("Error adding family %v: %v", fam.FamilyName, err)
@@ -195,8 +193,7 @@ func handleRsvpResponse(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		log.Printf("Payload is %v", payload.Responses)
-		log.Printf("Payload is %v", payload.FamilyID)
+		log.Printf("Responding RSVPs for family %d with values %v", payload.FamilyID, payload.Responses)
 
 		err := guestModel.RespondRsvp(payload)
 		if err != nil {

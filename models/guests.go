@@ -10,6 +10,7 @@ type Guest struct {
 	GuestID      int    `json:"guestId"`
 	FirstName    string `json:"firstName"`
 	LastName     string `json:"lastName"`
+	RsvpStatus   string `json:"rsvpStatus"`
 	EmailAddress string `json:"emailAddress"`
 	PhoneNumber  string `json:"phoneNumber"`
 	SongRequest  string `json:"songRequest"`
@@ -45,14 +46,6 @@ type Response struct {
 	PlusOneLastName  string `json:"plusOneLastName"`
 }
 
-// RSVP values
-const pending = "pending"
-const pendingValue = 1
-const declined = "declined"
-const declinedValue = 2
-const accepted = "accepted"
-const acceptedValue = 3
-
 // GuestModel holds database connection.
 type GuestModel struct {
 	DB *sql.DB
@@ -79,12 +72,17 @@ SELECT families.family_id,
        guestsInfo.email_addr,
        guestsInfo.phone_number,
        guestsInfo.song_request,
-       guestsInfo.is_plus_one
+       guestsInfo.is_plus_one,
+       rsvpCodes.status_name
 FROM families
 	join invitationCodes
     	on families.family_id = invitationCodes.family_id
 	join guestsInfo
 		on guestsInfo.family_id = families.family_id
+	left join rsvpList
+		on rsvpList.guest_id = guestsInfo.guest_id
+	left join rsvpCodes
+		on rsvpCodes.status_id = rsvpList.status_id
 WHERE invitationCodes.invitation_code = $1
 ORDER BY families.family_id, guestsInfo.guest_id;
 `
@@ -112,6 +110,7 @@ ORDER BY families.family_id, guestsInfo.guest_id;
 			&guest.PhoneNumber,
 			&guest.SongRequest,
 			&guest.IsPlusOne,
+			&guest.RsvpStatus,
 		)
 		if err != nil {
 			return Family{}, err
@@ -218,23 +217,39 @@ const insertGuestsInfo = `
 		INSERT INTO guestsInfo
 		(family_id, first_name, last_name, email_addr, phone_number, song_request, is_plus_one)
 		VALUES ($1,$2,$3,$4,$5,$6,$7)
+		RETURNING guest_id
 	`
+const insertRsvpList = `
+insert into rsvpList
+(guest_id, status_id)
+values ($1, $2)
+`
 
 func (m *GuestModel) insertNewGuests(tx *sql.Tx, newFamily Family, familyID int) error {
 	log.Println("In insertNewGuests")
-	stmt, err := m.prepareStatements(tx, insertGuestsInfo)
+	guestsInfoStmt, err := m.prepareStatements(tx, insertGuestsInfo)
 	if err != nil {
 		return err
 	}
-	defer func(stmt *sql.Stmt) {
-		err := stmt.Close()
+	rsvpListStmt, err := m.prepareStatements(tx, insertRsvpList)
+	if err != nil {
+		return err
+	}
+	defer func(guestsInfoStmt *sql.Stmt, rsvpListStmt *sql.Stmt) {
+		err := guestsInfoStmt.Close()
 		if err != nil {
 			log.Fatal(err)
 		}
-	}(stmt)
+		err = rsvpListStmt.Close()
+		if err != nil {
+			log.Fatal(err)
+		}
+	}(guestsInfoStmt, rsvpListStmt)
 
 	for _, familyMember := range newFamily.FamilyMembers {
-		_, err := stmt.Exec(
+		var guestID int64
+
+		err := guestsInfoStmt.QueryRow(
 			familyID,
 			familyMember.FirstName,
 			familyMember.LastName,
@@ -242,18 +257,26 @@ func (m *GuestModel) insertNewGuests(tx *sql.Tx, newFamily Family, familyID int)
 			familyMember.PhoneNumber,
 			familyMember.SongRequest,
 			familyMember.IsPlusOne,
+		).Scan(&guestID)
+		if err != nil {
+			return err
+		}
+		_, err = rsvpListStmt.Exec(
+			guestID,
+			1,
 		)
 		if err != nil {
 			return err
 		}
 	}
+
 	return nil
 }
 
-const respondRsvpCode = `
-insert into rsvpList
-(guest_id, status_id)
-values ($1, $2)
+const updateRsvpList = `
+update rsvpList
+set status_id = $1
+where guest_id = $2
 `
 const updatePlusOnesInfo = `
 update guestsInfo
@@ -269,6 +292,11 @@ set email_addr = $1,
 song_request = $2
 where guest_id = $3
 `
+const updateFamilyHasResponded = `
+update families
+set has_responded = true
+where family_id = $1
+`
 
 func (m *GuestModel) RespondRsvp(RsvpResponses RsvpResponse) error {
 	tx, err := m.DB.Begin()
@@ -277,7 +305,7 @@ func (m *GuestModel) RespondRsvp(RsvpResponses RsvpResponse) error {
 	}
 	defer tx.Rollback()
 
-	rsvpStmt, err := tx.Prepare(respondRsvpCode)
+	rsvpStmt, err := tx.Prepare(updateRsvpList)
 	if err != nil {
 		return err
 	}
@@ -295,9 +323,16 @@ func (m *GuestModel) RespondRsvp(RsvpResponses RsvpResponse) error {
 	}
 	defer guestStmt.Close()
 
+	familyStmt, err := tx.Prepare(updateFamilyHasResponded)
+	if err != nil {
+		return err
+	}
+	defer familyStmt.Close()
+
 	for _, guestResponse := range RsvpResponses.Responses {
-		_, err := rsvpStmt.Exec(guestResponse.GuestID, guestResponse.Answer)
+		_, err := rsvpStmt.Exec(guestResponse.Answer, guestResponse.GuestID)
 		if err != nil {
+			log.Println("Issue in rsvpStmt")
 			return err
 		}
 
@@ -309,17 +344,28 @@ func (m *GuestModel) RespondRsvp(RsvpResponses RsvpResponse) error {
 				guestResponse.SongRequest,
 				guestResponse.GuestID,
 			)
+			if err != nil {
+				log.Println("Issue in plusOneStmt")
+				return err
+			}
 		} else {
 			_, err = guestStmt.Exec(
 				guestResponse.EmailAddress,
 				guestResponse.SongRequest,
 				guestResponse.GuestID,
 			)
+			if err != nil {
+				log.Println("Issue in guestStmt")
+				return err
+			}
 		}
-
-		if err != nil {
-			return err
-		}
+	}
+	_, err = familyStmt.Exec(
+		RsvpResponses.FamilyID,
+	)
+	if err != nil {
+		log.Println("Issue in rsvpStmt")
+		return err
 	}
 
 	return tx.Commit()
