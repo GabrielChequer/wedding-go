@@ -9,6 +9,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"wedding-go/email"
 	"wedding-go/models"
 
 	dbconnection "wedding-go/db-connection"
@@ -175,9 +176,8 @@ func searchInviteHandler(db *sql.DB) http.HandlerFunc {
 	}
 }
 
-func handleRsvpResponse(db *sql.DB) http.HandlerFunc {
+func handleRsvpResponse(db *sql.DB, emailSvc *email.Service) http.HandlerFunc {
 	guestModel := models.NewGuestModel(db)
-	log.Printf("In handleRsvpResponse")
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
 			http.Error(w, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
@@ -201,10 +201,29 @@ func handleRsvpResponse(db *sql.DB) http.HandlerFunc {
 			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 			return
 		}
+
+		sendConfirmationEmails(emailSvc, payload.Responses)
+
 		w.Header().Set("Content-Type", "application/json")
 		err = json.NewEncoder(w).Encode("It's all good!")
 		if err != nil {
 			return
+		}
+	}
+}
+
+// sendConfirmationEmails sends one confirmation email per unique address in the responses.
+// Answer == 2 means attending (matches the rsvpCodes status_id for "attending").
+func sendConfirmationEmails(emailSvc *email.Service, responses []dbModels.Response) {
+	sent := map[string]bool{}
+	for _, r := range responses {
+		if r.EmailAddress == "" || sent[r.EmailAddress] {
+			continue
+		}
+		sent[r.EmailAddress] = true
+		attending := r.Answer == 2
+		if err := emailSvc.SendRsvpConfirmation(r.EmailAddress, attending); err != nil {
+			log.Printf("failed to send confirmation email to %s: %v", r.EmailAddress, err)
 		}
 	}
 }
@@ -277,13 +296,21 @@ func main() {
 		}
 	}(db)
 
+	emailSvc := email.NewService(email.Config{
+		Host:     getEnv("SMTP_HOST", "smtp.gmail.com"),
+		Port:     getEnv("SMTP_PORT", "587"),
+		Username: getEnv("SMTP_USERNAME", ""),
+		Password: getEnv("SMTP_PASSWORD", ""),
+		From:     getEnv("SMTP_FROM", ""),
+	})
+
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("/hello", helloHandler)
 	mux.HandleFunc("/greeting", greetingHandler)
 	mux.HandleFunc("/populateGuests", populateGuests(db))
 	mux.HandleFunc("/searchInvite", searchInviteHandler(db))
-	mux.HandleFunc("/respond-rsvp", handleRsvpResponse(db))
+	mux.HandleFunc("/respond-rsvp", handleRsvpResponse(db, emailSvc))
 
 	log.Println("Listening on :8080")
 	if err := http.ListenAndServe(":8080", cors(mux)); err != nil {
