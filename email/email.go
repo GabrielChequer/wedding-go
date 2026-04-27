@@ -36,7 +36,7 @@ var confirmationTmpl = template.Must(template.New("rsvp-confirmation").Parse(con
 // SendRsvpConfirmation sends a styled HTML confirmation to toAddr.
 // Silently skips if SMTP credentials are not configured.
 func (s *Service) SendRsvpConfirmation(toAddr string, firstName string, lastName string) error {
-	log.Printf("Sending rsvp-confirmation to %s", toAddr)
+	log.Printf("Sending rsvp-confirmation to %s %s@%s", firstName, lastName, toAddr)
 	if s.cfg.Username == "" || s.cfg.Password == "" {
 		return nil
 	}

@@ -58,7 +58,7 @@ func NewGuestModel(db *sql.DB) *GuestModel {
 
 // GetFamilyByInvitationCode fetches a guest by invitation code.
 func (m *GuestModel) GetFamilyByInvitationCode(invitationCode string) (Family, error) {
-	log.Printf("Getting Family by invitation code %s", invitationCode)
+	log.Printf("In GetFamilyByInvitationCode for invite %s", invitationCode)
 	query := `
 SELECT families.family_id,
        families.family_name,
@@ -136,7 +136,7 @@ WHERE guestsInfo.guest_id = $1
 
 // GetGuestInfoByGuestID fetches a guest by invitation code.
 func (m *GuestModel) GetGuestInfoByGuestID(guestID int) (string, string, error) {
-	log.Printf("Getting guest by guestID %d", guestID)
+	log.Printf("In GetGuestInfoByGuestID for guestID %d", guestID)
 
 	rows, err := m.DB.Query(searchGuestByID, guestID)
 	if err != nil {
@@ -163,7 +163,7 @@ func (m *GuestModel) GetGuestInfoByGuestID(guestID int) (string, string, error) 
 
 func (m *GuestModel) InsertNewFamiliesAndGuests(newFamily Family) (string, int, error) {
 
-	log.Printf("Inserting new family: %+v", newFamily)
+	log.Printf("In InsertNewFamiliesAndGuests for new family: %+v", newFamily)
 
 	tx, err := m.DB.Begin()
 	if err != nil {
@@ -200,7 +200,7 @@ func (m *GuestModel) InsertNewFamiliesAndGuests(newFamily Family) (string, int, 
 }
 
 func (m *GuestModel) insertNewFamily(tx *sql.Tx, newFamily Family) (int, error) {
-	log.Println("In insertNewFamily")
+	log.Printf("In insertNewFamily for Family %v\n", newFamily)
 
 	var familyID int
 
@@ -228,7 +228,7 @@ values ($1, $2)
 `
 
 func (m *GuestModel) insertNewInvitationCode(tx *sql.Tx, invitationCode string, familyID int) error {
-	log.Println("In insertNewInvitationCode")
+	log.Printf("In insertNewInvitationCode for famly %d", familyID)
 	stmt, err := m.prepareStatements(tx, insertInvitationCodes)
 	if err != nil {
 		return err
@@ -260,7 +260,7 @@ values ($1, $2)
 `
 
 func (m *GuestModel) insertNewGuests(tx *sql.Tx, newFamily Family, familyID int) error {
-	log.Println("In insertNewGuests")
+	log.Printf("In insertNewGuests for family %d", familyID)
 	guestsInfoStmt, err := m.prepareStatements(tx, insertGuestsInfo)
 	if err != nil {
 		return err
@@ -333,6 +333,7 @@ where family_id = $1
 `
 
 func (m *GuestModel) RespondRsvp(RsvpResponses RsvpResponse) error {
+	log.Printf("In RespondRsvp for family %d", RsvpResponses.FamilyID)
 	tx, err := m.DB.Begin()
 	if err != nil {
 		return err
