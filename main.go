@@ -178,6 +178,7 @@ func searchInviteHandler(db *sql.DB) http.HandlerFunc {
 
 func handleRsvpResponse(db *sql.DB, emailSvc *email.Service) http.HandlerFunc {
 	guestModel := models.NewGuestModel(db)
+	log.Printf("In handleRsvpResponse")
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
 			http.Error(w, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
@@ -195,6 +196,7 @@ func handleRsvpResponse(db *sql.DB, emailSvc *email.Service) http.HandlerFunc {
 
 		log.Printf("Responding RSVPs for family %d with values %v", payload.FamilyID, payload.Responses)
 
+		// Insert data into Database
 		err := guestModel.RespondRsvp(payload)
 		if err != nil {
 			log.Printf("Failed to respond to rsvp: %v", err)
@@ -202,7 +204,8 @@ func handleRsvpResponse(db *sql.DB, emailSvc *email.Service) http.HandlerFunc {
 			return
 		}
 
-		sendConfirmationEmails(emailSvc, payload.Responses)
+		// Send confirmation email
+		sendConfirmationEmails(guestModel, emailSvc, payload.Responses)
 
 		w.Header().Set("Content-Type", "application/json")
 		err = json.NewEncoder(w).Encode("It's all good!")
@@ -213,16 +216,19 @@ func handleRsvpResponse(db *sql.DB, emailSvc *email.Service) http.HandlerFunc {
 }
 
 // sendConfirmationEmails sends one confirmation email per unique address in the responses.
-// Answer == 2 means attending (matches the rsvpCodes status_id for "attending").
-func sendConfirmationEmails(emailSvc *email.Service, responses []dbModels.Response) {
+func sendConfirmationEmails(guestModel *models.GuestModel, emailSvc *email.Service, responses []dbModels.Response) {
 	sent := map[string]bool{}
 	for _, r := range responses {
 		if r.EmailAddress == "" || sent[r.EmailAddress] {
 			continue
 		}
-		sent[r.EmailAddress] = true
-		attending := r.Answer == 2
-		if err := emailSvc.SendRsvpConfirmation(r.EmailAddress, attending); err != nil {
+		sent[r.EmailAddress] = true // At the top in case it fails, we don't stay on a loop if there's an issue with a guest
+		firstName, lastName, err := guestModel.GetGuestInfoByGuestID(r.GuestID)
+		if err != nil {
+			log.Printf("Failed to get guest info: %v", err)
+			continue
+		}
+		if err := emailSvc.SendRsvpConfirmation(r.EmailAddress, firstName, lastName); err != nil {
 			log.Printf("failed to send confirmation email to %s: %v", r.EmailAddress, err)
 		}
 	}
@@ -299,9 +305,9 @@ func main() {
 	emailSvc := email.NewService(email.Config{
 		Host:     getEnv("SMTP_HOST", "smtp.gmail.com"),
 		Port:     getEnv("SMTP_PORT", "587"),
-		Username: getEnv("SMTP_USERNAME", ""),
-		Password: getEnv("SMTP_PASSWORD", ""),
-		From:     getEnv("SMTP_FROM", ""),
+		Username: getEnv("SMTP_USERNAME", "chequeros1@gmail.com"),
+		Password: getEnv("SMTP_PASSWORD", "tvdk hzcx ktaz jxwm"),
+		From:     getEnv("SMTP_FROM", "noreply"),
 	})
 
 	mux := http.NewServeMux()

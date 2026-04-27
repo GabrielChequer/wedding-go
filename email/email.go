@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"html/template"
+	"log"
 	"net/smtp"
 )
 
@@ -26,20 +27,22 @@ func NewService(cfg Config) *Service {
 }
 
 type templateData struct {
-	Attending bool
+	FirstName string
+	LastName  string
 }
 
 var confirmationTmpl = template.Must(template.New("rsvp-confirmation").Parse(confirmationHTML))
 
 // SendRsvpConfirmation sends a styled HTML confirmation to toAddr.
 // Silently skips if SMTP credentials are not configured.
-func (s *Service) SendRsvpConfirmation(toAddr string, attending bool) error {
+func (s *Service) SendRsvpConfirmation(toAddr string, firstName string, lastName string) error {
+	log.Printf("Sending rsvp-confirmation to %s", toAddr)
 	if s.cfg.Username == "" || s.cfg.Password == "" {
 		return nil
 	}
 
 	var body bytes.Buffer
-	if err := confirmationTmpl.Execute(&body, templateData{Attending: attending}); err != nil {
+	if err := confirmationTmpl.Execute(&body, templateData{FirstName: firstName, LastName: lastName}); err != nil {
 		return fmt.Errorf("rendering confirmation template: %w", err)
 	}
 
@@ -57,11 +60,15 @@ func (s *Service) SendRsvpConfirmation(toAddr string, attending bool) error {
 const confirmationHTML = `<!DOCTYPE html>
 <html lang="en">
 <head>
+  <link
+      href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400&family=Jost:wght@200;300;400;500&display=swap"
+      rel="stylesheet"
+    />
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>RSVP Confirmed — Kelsie &amp; Gabriel</title>
 </head>
-<body style="margin:0;padding:0;background-color:#f9f5ef;font-family:Arial,Helvetica,sans-serif;">
+<body style="margin:0;padding:0;background-color:#f9f5ef;font-family:'Jost',sans-serif;">
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f9f5ef;padding:40px 20px;">
     <tr>
       <td align="center">
@@ -70,11 +77,9 @@ const confirmationHTML = `<!DOCTYPE html>
           <!-- Header -->
           <tr>
             <td style="background-color:#3b4834;padding:40px 48px;text-align:center;">
-              <p style="margin:0 0 14px;color:#b89b6a;font-size:10px;letter-spacing:0.3em;text-transform:uppercase;font-family:Arial,sans-serif;">You&#39;re Invited</p>
-              <h1 style="margin:0;color:#f9f5ef;font-family:Georgia,'Times New Roman',serif;font-size:44px;font-weight:300;letter-spacing:0.04em;">
-                K <span style="color:#b89b6a;font-style:italic;">&amp;</span> G
+              <h1 style="margin:0;color:#f9f5ef;font-family:'Cormorant Garamond', serif;font-size:44px;font-weight:300;letter-spacing:0.04em;">
+                K <span style="color:#b89b6a;font-style: italic;">&amp;</span> G
               </h1>
-              <p style="margin:14px 0 0;color:#c5d3c6;font-size:11px;letter-spacing:0.22em;text-transform:uppercase;font-family:Arial,sans-serif;">Kelsie &amp; Gabriel</p>
             </td>
           </tr>
 
@@ -85,11 +90,11 @@ const confirmationHTML = `<!DOCTYPE html>
 
           <!-- Body -->
           <tr>
-            <td style="padding:48px 48px 40px;">
+            <td style="padding:48px 40px 40px;">
 
-              <p style="margin:0 0 6px;color:#b89b6a;font-size:10px;letter-spacing:0.28em;text-transform:uppercase;font-family:Arial,sans-serif;">RSVP Confirmation</p>
-              <h2 style="margin:0 0 20px;color:#2c2c2c;font-family:Georgia,'Times New Roman',serif;font-size:28px;font-weight:300;line-height:1.3;">
-                We received your response
+              <p style="margin:0 0 6px;color:#b89b6a;font-size:10px;letter-spacing:0.28em;text-transform:uppercase;font-family:'Cormorant Garamond',serif;">RSVP Confirmation</p>
+              <h2 style="margin:0 0 20px;color:#2c2c2c;font-family:'Cormorant Garamond',serif;font-size:28px;font-weight:300;line-height:1.3;">
+                Hey {{.firstName}}, we received your response
               </h2>
               <!-- Accent divider -->
               <table role="presentation" width="60" cellpadding="0" cellspacing="0" style="margin-bottom:28px;">
@@ -99,42 +104,39 @@ const confirmationHTML = `<!DOCTYPE html>
               </table>
 
               <p style="color:#2c2c2c;font-size:15px;line-height:1.75;margin:0 0 20px;">
-                Thank you for responding to our wedding invitation. We have received your RSVP and are so grateful you took the time to let us know.
+                Thank you for responding to our wedding invitation. We have received your RSVP and we look forward to seeing you there!
               </p>
 
-              {{if .Attending}}
               <p style="color:#2c2c2c;font-size:15px;line-height:1.75;margin:0 0 36px;">
-                We are <em>so</em> excited to celebrate this day with you. See you there!
+                We will reach out to you if there are any updates. In the meantime, don't hesitate to contact us with any questions at 
+                <a href="mailto:kelsie.renfrow347@gmail.com" style="color:#b89b6a;text-decoration:underline;">Kelsie's email</a>
+                or 
+                <a href="mailto:chequeros1@gmail.com" style="color:#b89b6a;text-decoration:underline;">Gabriel's email</a>.
               </p>
-              {{else}}
-              <p style="color:#2c2c2c;font-size:15px;line-height:1.75;margin:0 0 36px;">
-                We&#39;re sorry you won&#39;t be able to join us, but we truly appreciate you letting us know. You will be missed!
-              </p>
-              {{end}}
 
               <!-- Event details card -->
               <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f9f5ef;border:1px solid #c5d3c6;margin-bottom:40px;">
                 <tr>
                   <td style="padding:28px 32px;">
-                    <p style="margin:0 0 4px;color:#b89b6a;font-size:10px;letter-spacing:0.28em;text-transform:uppercase;font-family:Arial,sans-serif;">The Celebration</p>
-                    <h3 style="margin:0 0 20px;color:#2c2c2c;font-family:Georgia,'Times New Roman',serif;font-size:20px;font-weight:300;">Kelsie &amp; Gabriel</h3>
+                    <p style="margin:0 0 4px;color:#b89b6a;font-size:10px;letter-spacing:0.28em;text-transform:uppercase;font-family:'Cormorant Garamond',serif;">The Celebration</p>
+                    <h3 style="margin:0 0 20px;color:#2c2c2c;font-family:'Cormorant Garamond',serif;font-size:20px;font-weight:300;">Kelsie &amp; Gabriel</h3>
                     <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
                       <tr>
                         <td style="padding:10px 0;border-bottom:1px solid #c5d3c6;">
-                          <span style="color:#8a9e8c;font-size:10px;letter-spacing:0.15em;text-transform:uppercase;display:inline-block;width:80px;font-family:Arial,sans-serif;">Date</span>
-                          <span style="color:#2c2c2c;font-size:14px;font-family:Arial,sans-serif;">September 25, 2027</span>
+                          <span style="color:#8a9e8c;font-size:10px;letter-spacing:0.15em;text-transform:uppercase;display:inline-block;width:80px;font-family:'Cormorant Garamond',serif;">Date</span>
+                          <span style="color:#2c2c2c;font-size:14px;font-family:'Jost',sans-serif;">September 25, 2027</span>
                         </td>
                       </tr>
                       <tr>
                         <td style="padding:10px 0;border-bottom:1px solid #c5d3c6;">
-                          <span style="color:#8a9e8c;font-size:10px;letter-spacing:0.15em;text-transform:uppercase;display:inline-block;width:80px;font-family:Arial,sans-serif;">Venue</span>
-                          <span style="color:#2c2c2c;font-size:14px;font-family:Arial,sans-serif;">The Magnolia</span>
+                          <span style="color:#8a9e8c;font-size:10px;letter-spacing:0.15em;text-transform:uppercase;display:inline-block;width:80px;font-family:'Cormorant Garamond',serif;">Venue</span>
+                          <span style="color:#2c2c2c;font-size:14px;font-family:'Jost',sans-serif;">The Magnolia</span>
                         </td>
                       </tr>
                       <tr>
                         <td style="padding:10px 0;">
-                          <span style="color:#8a9e8c;font-size:10px;letter-spacing:0.15em;text-transform:uppercase;display:inline-block;width:80px;font-family:Arial,sans-serif;">Location</span>
-                          <span style="color:#2c2c2c;font-size:14px;font-family:Arial,sans-serif;">Clarksville, Indiana</span>
+                          <span style="color:#8a9e8c;font-size:10px;letter-spacing:0.15em;text-transform:uppercase;display:inline-block;width:80px;font-family:'Cormorant Garamond',serif;">Location</span>
+                          <span style="color:#2c2c2c;font-size:14px;font-family:'Jost',sans-serif;">Clarksville, Indiana</span>
                         </td>
                       </tr>
                     </table>
@@ -142,7 +144,7 @@ const confirmationHTML = `<!DOCTYPE html>
                 </tr>
               </table>
 
-              <p style="color:#8b7355;font-size:14px;line-height:1.75;margin:0;">
+              <p style="color:#8b7355;font-family:'Cormorant Garamond',serif;font-size:14px;line-height:1.75;margin:0;">
                 With love,<br>
                 <span style="font-family:Georgia,serif;font-size:17px;color:#2c2c2c;">Kelsie &amp; Gabriel</span>
               </p>

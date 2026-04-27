@@ -127,6 +127,40 @@ ORDER BY families.family_id, guestsInfo.guest_id;
 	return family, nil
 }
 
+const searchGuestByID = `
+SELECT guestsInfo.first_name,
+       guestsInfo.last_name
+FROM guestsInfo
+WHERE guestsInfo.guest_id = $1
+`
+
+// GetGuestInfoByGuestID fetches a guest by invitation code.
+func (m *GuestModel) GetGuestInfoByGuestID(guestID int) (string, string, error) {
+	log.Printf("Getting guest by guestID %d", guestID)
+
+	rows, err := m.DB.Query(searchGuestByID, guestID)
+	if err != nil {
+		return "", "", err
+	}
+	defer rows.Close()
+	var guest Guest
+	for rows.Next() {
+
+		err := rows.Scan(
+			&guest.FirstName,
+			&guest.LastName,
+		)
+		if err != nil {
+			return "", "", err
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return "", "", err
+	}
+
+	return guest.FirstName, guest.LastName, nil
+}
+
 func (m *GuestModel) InsertNewFamiliesAndGuests(newFamily Family) (string, int, error) {
 
 	log.Printf("Inserting new family: %+v", newFamily)
