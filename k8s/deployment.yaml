@@ -35,6 +35,6 @@ spec:
             # The port your application listens to INSIDE the container
             # This is informational for Kubernetes but helps Services map traffic
 
-          env:
-            - name: DB_HOST
-              value: testing
+          envFrom:
+            - secretRef:
+                name: wedding-go-secrets

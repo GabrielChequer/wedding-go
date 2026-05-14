@@ -277,13 +277,12 @@ func cors(next http.Handler) http.Handler {
 func main() {
 	log.Println("Initializing database")
 
-	// TODO: offload this to environment variables once app is running in Kubernetes
 	config := dbconnection.DBConnection{
-		Host:     getEnv("DB_HOST", "localhost"),
+		Host:     getEnv("DB_HOST", ""),
 		Port:     getEnvInt("DB_PORT", 5432),
-		Username: getEnv("DB_USER", "wedding_user"),
-		Password: getEnv("DB_PASSWORD", "wedding_pass"),
-		Database: getEnv("DB_NAME", "weddingdb"),
+		Username: getEnv("DB_USER", ""),
+		Password: getEnv("DB_PASSWORD", ""),
+		Database: getEnv("DB_NAME", ""),
 		SSLMode:  getEnv("DB_SSLMODE", "disable"),
 	}
 
@@ -303,10 +302,10 @@ func main() {
 	}(db)
 
 	emailSvc := email.NewService(email.Config{
-		Host:     getEnv("SMTP_HOST", "smtp.gmail.com"),
+		Host:     getEnv("SMTP_HOST", ""),
 		Port:     getEnv("SMTP_PORT", "587"),
-		Username: getEnv("SMTP_USERNAME", "chequeros1@gmail.com"),
-		Password: getEnv("SMTP_PASSWORD", "tvdk hzcx ktaz jxwm"),
+		Username: getEnv("SMTP_USERNAME", ""),
+		Password: getEnv("SMTP_PASSWORD", ""),
 		From:     getEnv("SMTP_FROM", "noreply"),
 	})
 
