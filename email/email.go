@@ -36,7 +36,7 @@ var confirmationTmpl = template.Must(template.New("rsvp-confirmation").Parse(con
 // SendRsvpConfirmation sends a styled HTML confirmation to toAddr.
 // Silently skips if SMTP credentials are not configured.
 func (s *Service) SendRsvpConfirmation(toAddr string, firstName string, lastName string) error {
-	log.Printf("Sending rsvp-confirmation to %s %s@%s", firstName, lastName, toAddr)
+	log.Printf("Sending rsvp-confirmation to %s %s @ %s", firstName, lastName, toAddr)
 	if s.cfg.Username == "" || s.cfg.Password == "" {
 		return nil
 	}
@@ -94,7 +94,7 @@ const confirmationHTML = `<!DOCTYPE html>
 
               <p style="margin:0 0 6px;color:#b89b6a;font-size:10px;letter-spacing:0.28em;text-transform:uppercase;font-family:'Cormorant Garamond',serif;">RSVP Confirmation</p>
               <h2 style="margin:0 0 20px;color:#2c2c2c;font-family:'Cormorant Garamond',serif;font-size:28px;font-weight:300;line-height:1.3;">
-                Hey {{.firstName}}, we received your response
+                Hey {{.FirstName}}, we received your response
               </h2>
               <!-- Accent divider -->
               <table role="presentation" width="60" cellpadding="0" cellspacing="0" style="margin-bottom:28px;">
